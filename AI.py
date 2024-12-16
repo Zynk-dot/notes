@@ -98,8 +98,9 @@ def main():
 
     print("\n===================== SUMMARY =====================\n")
     print(display_summary(summary_result.strip()))  
-    print("\n====================================================")n
+    print("\n====================================================")
     print(f"\nActual Time Taken: {time_taken:.2f} seconds")
 
 if __name__ == "__main__":
     main()
+    

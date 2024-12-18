@@ -1,87 +1,171 @@
+import math
 import time
 import os
 import sys
+import re
+from collections import defaultdict, Counter
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from transformers import pipeline, logging
+import spacy
 
-logging.set_verbosity_error()  
+# Suppress warnings
+logging.set_verbosity_error()
 
+# Load SpaCy model
+try:
+    nlp = spacy.load("en_core_web_sm")
+except:
+    os.system("python -m spacy download en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
+
+# Initialize Summarization Pipeline
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
-TOKEN_LIMIT = 1024
+# Constants
+WORD_LIMIT = 250
 MIN_WORD_COUNT_FOR_SUMMARY = 20
 
-def summarize_text_dynamic(input_text, scaling_factor=0.2, buffer_tokens=20):
+def split_into_chunks(text, word_limit=WORD_LIMIT):
+    """
+    Splits text into smaller chunks of up to `word_limit` words,
+    ensuring splits occur at sentence boundaries.
+    """
+    doc = nlp(text)
+    chunks = []
+    current_chunk = []
+    current_word_count = 0
+
+    for sentence in doc.sents:
+        sentence_word_count = len(sentence.text.split())
+        if current_word_count + sentence_word_count > word_limit:
+            chunks.append(" ".join(current_chunk))
+            current_chunk = []
+            current_word_count = 0
+
+        current_chunk.append(sentence.text)
+        current_word_count += sentence_word_count
+
+    if current_chunk:
+        chunks.append(" ".join(current_chunk))  # Add the last chunk
+
+    return chunks
+
+def summarize_text_dynamic(input_text, scaling_factor=0.3):
+    """
+    Summarizes input text dynamically with scaling based on chunk size.
+    """
     word_count = len(input_text.split())
-
-    if word_count < MIN_WORD_COUNT_FOR_SUMMARY:
-        return None
-
-    max_length = int(word_count * scaling_factor)  
-    min_length = int(max_length * 0.6)  
-
-    if max_length > word_count:
-        max_length = word_count - 1  
-
-    if max_length < 50:
-        max_length = 50
-        min_length = 20
-
-    max_length = min(min_length, TOKEN_LIMIT)
+    max_length = min(int(word_count * scaling_factor), 512)
+    min_length = int(max_length * 0.6)
 
     summary = summarizer(
         input_text, 
-        max_length=max_length + buffer_tokens,  
+        max_length=max_length, 
         min_length=min_length, 
-        do_sample=False, 
-        early_stopping=True,  
+        do_sample=False
     )
+    return summary[0]["summary_text"].strip()
 
-    complete_summary = summary[0]['summary_text'].strip()
-
-    if complete_summary[-1] not in ".!?":
-        complete_summary = summarize_text_dynamic(input_text, scaling_factor, buffer_tokens + 10)
-
-        return complete_summary 
-
-def display_bullet_summary(summary_text):
+def generate_bullets(summary_text):
+    """
+    Generates bullet points from a summarized text.
+    """
     bullets = []
-    sentences = summary_text.replace("\n", " ").strip().split(". ")
+    doc = nlp(summary_text)
+    sentences = [sent.text.strip() for sent in doc.sents]
+
     for sentence in sentences:
-        if sentence:
-            main_point = f"- {sentence.strip()}."
-            sub_points = [f"  • {sub.strip()}" for sub in sentence.split(",") if sub]
-            bullets.append(main_point)
-            bullets.extend(sub_points[1:])  # Add sub-bullets except the main point
-    return "\n".join(bullets)
+        bullets.append(f"  • {sentence.capitalize()}")
 
-def booting_animation():
-    for _ in range(3):
-        sys.stdout.write("\rAI Booting .  ")
-        sys.stdout.flush()
-        time.sleep(0.5)
-        sys.stdout.write("\rAI Booting .. ")
-        sys.stdout.flush()
-        time.sleep(0.5)
-        sys.stdout.write("\rAI Booting ...")
-        sys.stdout.flush()
-        time.sleep(0.5)
-    sys.stdout.write("\r                 \r")  
+    return bullets
 
-def break_input_into_chunks(input_text):
-    words = input_text.split()
-    chunks = []
+def normalize_themes(themes):
+    """
+    Normalize themes by lemmatizing and converting to lowercase.
+    """
+    lemmatized_themes = []
+    for theme in themes:
+        doc = nlp(theme)
+        lemma = " ".join([token.lemma_ for token in doc])
+        lemmatized_themes.append(lemma.lower())
+    return lemmatized_themes
+
+def merge_similar_themes(themes, threshold=0.7):
+    """
+    Merge similar themes using cosine similarity.
+    Themes with similarity above the threshold are combined.
+    """
+    vectorizer = CountVectorizer().fit_transform(themes)
+    vectors = vectorizer.toarray()
+    cosine_matrix = cosine_similarity(vectors)
+
+    merged_themes = {}
+    used = set()
+
+    for i, theme1 in enumerate(themes):
+        if i in used:
+            continue
+        group = [theme1]
+        for j, theme2 in enumerate(themes):
+            if i != j and j not in used and cosine_matrix[i][j] > threshold:
+                group.append(theme2)
+                used.add(j)
+        used.add(i)
+        merged_themes[" & ".join(group)] = group[0]  # Combine similar themes
+
+    return merged_themes
+
+def extract_themes_from_text(text):
+    """
+    Extracts key themes (topics) from the text dynamically using keyword analysis.
+    """
+    doc = nlp(text)
     
-    for i in range(0, len(words), TOKEN_LIMIT):
-        chunk = " ".join(words[i:i+TOKEN_LIMIT])
-        chunks.append(chunk)
+    # Extract nouns and proper nouns for theme detection
+    candidates = [chunk.text.lower() for chunk in doc.noun_chunks]
+    stopwords = {"which", "that", "these", "those", "this", "it", "its"}  # Add more if needed
+    filtered_candidates = [word for word in candidates if word not in stopwords]
     
-    return chunks
+    # Rank themes by frequency
+    theme_counts = Counter(filtered_candidates)
+    top_themes = [item[0] for item in theme_counts.most_common(7)]  # Limit to top 7 themes
+    
+    # Capitalize themes for output
+    return [theme.capitalize() for theme in top_themes]
+
+def group_bullets_by_themes(bullets, themes):
+    """
+    Groups bullet points under normalized and merged themes.
+    """
+    # Normalize themes
+    normalized_themes = normalize_themes(themes)
+    merged_theme_map = merge_similar_themes(normalized_themes)
+
+    # Map bullets to merged themes
+    theme_groups = defaultdict(list)
+    for bullet in bullets:
+        assigned = False
+        for raw_theme, normalized_theme in merged_theme_map.items():
+            if normalized_theme in bullet.lower():
+                theme_groups[raw_theme].append(bullet)
+                assigned = True
+                break
+        if not assigned:
+            theme_groups["Miscellaneous"].append(bullet)
+
+    # Format grouped bullets
+    grouped_output = []
+    for theme, points in theme_groups.items():
+        grouped_output.append(f"- {theme.capitalize()}")
+        grouped_output.extend(points)
+    return grouped_output
 
 def main():
-    booting_animation()
-
-    print("Enter the paragraph or passage you'd like summarized (type --done to finish):\n")
-
+    """
+    Main function for summarization workflow.
+    """
+    print("Enter the paragraph you'd like summarized (type --done to finish):\n")
     input_text = ""
     while True:
         line = input()
@@ -89,38 +173,44 @@ def main():
             break
         input_text += line + "\n"
 
-    os.system('clear')
+    os.system("cls" if os.name == "nt" else "clear")
 
-    input_chunks = break_input_into_chunks(input_text)
+    if len(input_text.split()) < MIN_WORD_COUNT_FOR_SUMMARY:
+        print("Text is too short to summarize. Please provide a longer input.")
+        return
 
+    # Split input into manageable chunks (250 words max per chunk)
+    chunks = split_into_chunks(input_text, word_limit=250)
+    print(f"\nProcessing {len(chunks)} chunks...\n")
+
+    all_bullets = []  # Store only bullet points
     start_time = time.time()
 
-    word_count = len(input_text.split())
-    time_taken_estimation = word_count * 0.05  
+    for i, chunk in enumerate(chunks):
+        print(f"Processing chunk {i+1}/{len(chunks)}...")
 
-    print(f"Estimated Time to Summarize: ~{time_taken_estimation:.2f} seconds\n")
+        # Summarize the chunk
+        summarized_text = summarize_text_dynamic(chunk)
 
-    summary_result = ""
-    too_short = False
+        # Convert summary to bullet points and discard raw summary
+        if summarized_text:
+            bullets = generate_bullets(summarized_text)
+            all_bullets.extend(bullets)
 
-    for chunk in input_chunks:
-        result = summarize_text_dynamic(chunk)
-        if result is None:
-            too_short = True
-        else:
-            summary_result += result + " "
+        print(f"Completed chunk {i+1}/{len(chunks)}.\n")
 
-    time_taken = time.time() - start_time
+    # Extract themes dynamically
+    themes = extract_themes_from_text(input_text)
+    print(f"\nDetected Themes: {', '.join(themes)}")
 
-    print("\n===================== BULLET SUMMARY =====================\n")
+    # Group bullets by detected themes
+    grouped_bullets = group_bullets_by_themes(all_bullets, themes)
 
-    if too_short:
-        print("Note: This sentence is too short. The minimum word count should be 20.")
-    else:
-        print(display_bullet_summary(summary_result.strip()))  
-
-    print("\n==========================================================")
-    print(f"\nActual Time Taken: {time_taken:.2f} seconds")
+    # Output the final summary
+    print("\n===================== NESTED BULLET SUMMARY =====================\n")
+    print("\n".join(grouped_bullets))
+    print("\n=================================================================")
+    print(f"\nActual Time Taken: {time.time() - start_time:.2f} seconds")
 
 if __name__ == "__main__":
     main()

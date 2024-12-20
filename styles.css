@@ -1,0 +1,228 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: var(--background-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+:root {
+    --background-color: #f8f9fa;
+    --text-color: #343a40;
+    --container-bg: white;
+    --button-bg: #007bff;
+    --button-hover-bg: #0056b3;
+    --textarea-bg: #ffffff;
+    --textarea-border: #ced4da;
+    --overlay-bg: rgba(0, 0, 0, 0.5);
+}
+
+.dark-mode {
+    --background-color: #121212;
+    --text-color: #e9ecef;
+    --container-bg: #1e1e1e;
+    --button-bg: #1f6feb;
+    --button-hover-bg: #185ab4;
+    --textarea-bg: #2c2c2c;
+    --textarea-border: #555555;
+}
+
+.container {
+    width: 85%;
+    max-width: 1200px;
+    background: var(--container-bg);
+    border-radius: 12px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: background-color 0.3s ease;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+header h1 {
+    font-size: 36px;
+    color: var(--text-color);
+    margin-bottom: 20px;
+}
+
+.top-bar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 10px;
+}
+
+.icon {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.icon:hover {
+    transform: scale(1.1);
+}
+
+.button-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--button-bg);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+button:hover {
+    background-color: var(--button-hover-bg);
+    transform: scale(1.05);
+}
+
+.content {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+textarea {
+    width: 100%;
+    height: 400px;
+    border: 1px solid var(--textarea-border);
+    border-radius: 8px;
+    padding: 15px;
+    font-size: 16px;
+    resize: none;
+    background: var(--textarea-bg);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--button-bg);
+}
+
+footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--text-color);
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -300px;
+    width: 300px;
+    height: 100%;
+    background: var(--container-bg);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.3);
+    transition: left 0.3s ease;
+    z-index: 1000;
+}
+
+.sidebar.open {
+    left: 0;
+}
+
+.sidebar-content {
+    padding: 20px;
+    color: var(--text-color);
+}
+
+.sidebar-content h2 {
+    margin-bottom: 20px;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--overlay-bg);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+    z-index: 999;
+}
+
+.overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.sidebar-content button {
+    display: block;
+    width: 100%;
+    margin: 10px 0;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--button-bg);
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.sidebar-content button:hover {
+    background-color: var(--button-hover-bg);
+    transform: scale(1.05);
+}
+
+.console {
+    display: none; 
+    margin-top: 20px;
+    padding: 15px;
+    background: var(--container-bg);
+    border: 1px solid var(--textarea-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    max-height: 150px; 
+    overflow-y: scroll; 
+    font-family: "Courier New", Courier, monospace; 
+    font-size: 14px;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.console.visible {
+    display: block;
+}
+
+.console h3 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: var(--text-color);
+}
+
+.console pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word; 
+    color: var(--text-color);
+}

@@ -1,6 +1,6 @@
 # AI Summarizer - Beta Version
 
-![AI Summarizer Webpage](https://incomparable-banoffee-4c99f8.netlify.app/)
+[AI Summarizer Webpage](https://incomparable-banoffee-4c99f8.netlify.app/)
 
 AI Summarizer is a beta version of an AI-powered tool designed to provide accurate and concise text summarization and note-taking capabilities. This project uses advanced natural language processing to turn long, complex texts into easily digestible summaries and key points.
 
